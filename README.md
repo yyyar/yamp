@@ -1,11 +1,11 @@
-# YAMP - YAMP Application Messaging Protocol
+## Yamp - Application Messaging Protocol
 
-YAMP is simple and flexible messaging protocol for
+**Yamp** is simple and flexible messaging protocol for
 realtime client-server applications. It provides custom messages
-transfering alongside with request-response pattern. YAMP is transport
-and format agnostic so it may be adopted to any specific needs.
+transfering alongside with request-response pattern. **Yamp** is transport
+and format agnostic and may be adopted to any specific needs.
 
-This document describes YAMP v1.0 Draft.
+This document describes **Yamp v1.0 Draft**.
 
 
 ## Background
@@ -14,36 +14,36 @@ There are lots of messaging protocols out of there like AMQP, Thrift,
 RMI, MQTT, Socket.io, XMPP, ZMQ, and others. Many of them
 are overcomplicated and heavyweight, others suffer from lack of
 features. Some of them (for example, WAMP) designed explecitely for IoT and 
-require Router component as a mediator to be presented in a solution even where
+require Router component as a mediator to be presented in a solution, even where
 it's redundant. On other hand, protocols like Websockets can't handle 
 request-response pattern natively forcing developers to implement their own solutions.
 
-YAMP designed to provide application developers with the semantics they need
+**Yamp** designed to provide application developers with the semantics they need
 to implement client-server bi-directional communication with the following features:
 
-- Events: plain messages, or events. It's just that websocket can do.
-- Req / Res: RPC-like functionality, one party emits message on what other party should respond
+- Events: publish/subsribe pattern. It's just that websocket can do.
+- Requests: RPC-like functionality (req/res), one party emits message on what other party responds.
 - Progressive responses, request canceling and timeouts.
-- Transport Agnostic: works on top on TCP, UDP, websocket, or other.
-- Format Agnostic: message body may serialized/parsed with any setialization format: 
-  json, bson, xml, protobuf, flat buffers, msgpack, etc., and optional validation (if format supports it).
+- Pluggable Transports: can be implemented on top of any reliable protocol: TCP, TLS, websocket, or other.
+- Pluggable Formats: message body may serialized/parsed with any setialization format: 
+  json, bson, xml, protobuf, flat buffers, msgpack, etc., with optional validation (if format supports it).
 - Cross-Language: can be easily implemented in any language
 
 
 ## Structure
 
-Basically, YAMP defines messages structure and the way parties should handle them.
+Basically, **Yamp** operates with frames that are tranfered over specific transport.
 
 ```
-  message
+  frame
   +-----------------------------------------------+
   |                                               |
-  |  message-specific data                        |
+  |  frame-specific data                          |
   |                                               |
-  |  body (optional)                              |
+  |  body (user frames only)                      |
   |  +-----------------------------------------+  |
   |  |                                         |  |
-  |  |      (protobuf, msgpack, json, etc)   <-|--|------ serializer
+  |  |      (protobuf, msgpack, json, etc)   <-|--|------ format
   |  |                                         |  |
   |  +-----------------------------------------+  |
   |                                               |
@@ -57,33 +57,33 @@ Basically, YAMP defines messages structure and the way parties should handle the
 ```
 
 ### Transport adapters
-From a transport level, YAMP expects ability to send/receive buffer of data.
+From a transport adapter, **Yamp** expects ability to send/receive buffer (bytes array) of data.
 
 ```
-transport.send(buffer)
-buffer, count = transport.receive()
+transport.write(buffer)
+buffer = transport.read()
 ```
 
 
-### Serializator adapters
-From a serialization format YAMP expecet ability to serialize/parse a buffer of data.
+### Format adapters
+From a serialization format adapter **Yamp** expecet ability to serialize/parse a buffer of data.
 If serializer supports schema validation, it may be done in this step.
 
 ```
-buffer = serializer.serialize(body)
-body = serializer.parse(buffer)
+buffer = format.serialize(obj)
+obj = format.parse(buffer, [type])
 ```
 
 
 ## Assumptions
 
-YAMP uses network byte order (big-endian).
+**Yamp** uses network byte order (big-endian).
 We use C-alike pseudo language alongside pictures to describe messages structure.
 
-## Message
+## Frame
 
-This is the the only entity tranfered through transport.
-First byte is message type, next bytes interpretation are specific to concrete message type.
+Frames is what **Yamp** tranfes through transport.
+First byte is frame is frame type, following bytes interpretation are specific to concrete frame type.
 
 ```
 //
@@ -95,7 +95,7 @@ First byte is message type, next bytes interpretation are specific to concrete m
 //  +-------++~~~~~~~~~~~~~~ ~ ~ ~
 //
 
-Message {
+Frame {
 
   byte type
 
@@ -114,19 +114,19 @@ Message {
 ```
 
 
-## System Messages
+## System Frames
 
-These messages control internal communication between parties and are not exposed
+These frames control internal communication between parties and are not exposed
 to user as user messages. While defining user procotol one should not rely on these
-messages and use User Messages instead.
+frames and use User Messages instead.
 
 
 ### 0x00 system.handshake
 
-Should be first message after connection establishment client party send
+Should be first frame after connection establishment client party sends
 to server party to identify itself. Server party should respond with the same
-handshake message (echo) in case it support client, or with either
-`system.close` or `system:close-redirect` message.
+handshake (echo) in case it support client, or with either
+`system.close` or `system:close-redirect` frame.
 
 ```
 //
@@ -151,11 +151,10 @@ system.handshake {
 
 
 ### 0x01 system.ping
-
 My be periodically sent by any party to another to check if it's alive or
 keep underlying connection or session alive.
-Each `system.ping` request should be responded with corresponding
-`system.pong` message with the same payload within defined (reasonable)
+Each `system.ping` frame from one party should be followed with corresponding
+`system.pong` message from another party with the same payload within defined (reasonable)
 pediod of time.
 
 ```
@@ -179,8 +178,7 @@ system.ping {
 
 
 ### 0x02 system.pong
-
-Response message for a `system.ping`. See `system.ping`.
+Response for a `system.ping`. See `system.ping`.
 
 ```
 //
@@ -251,7 +249,7 @@ system.close-redirect {
 ```
 
 
-## User Messages
+## User Message Frames
 
 These messages are building blocks for user application protocol.
 
@@ -313,7 +311,7 @@ UserMessageBody {
 
 ### 0x05 event
 
-User message (pub/sub) with custom body produced by serializer.
+User message (pub/sub event) with custom body represented in defined format.
 
 ```
 //
@@ -355,7 +353,7 @@ which requester should provide user with an timeout error.
 request {
 
   UserMessageHeader  header       // (required)
-  bool               progressive  // (required) want receive progress responses
+  byte(bool)         progressive  // (required) want receive progress responses
   UserMessageBody    body         // (required)
 
 }
@@ -385,7 +383,7 @@ cancel {
 
   UserMessageHeader  header       // (required)
   byte[16]           request_uid  // (required) original request id to cancel
-  bool               kill         // (required) interrupt request processing
+  byte(bool)         kill         // (required) interrupt request processing
 
 }
 
