@@ -242,7 +242,7 @@ for example: `tcp://192.168.0.42:5000` or `ws://hostname:8888/hello/world?msg=go
 
 system.close-redirect {
 
-    byte[1]       size    // (required)
+    byte[2]       size    // (required)
     string[size]  url  // (required)
 }
 
