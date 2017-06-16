@@ -25,8 +25,7 @@ to implement client-server bi-directional communication with the following featu
 - Requests: RPC-like functionality (req/res), one party emits message on what other party responds.
 - Progressive responses, request canceling and timeouts.
 - Pluggable Transports: can be implemented on top of any reliable protocol: TCP, TLS, websocket, or other.
-- Pluggable Formats: message body may serialized/parsed with any setialization format: 
-  json, bson, xml, protobuf, flat buffers, msgpack, etc., with optional validation (if format supports it).
+- Pluggable Formats: message body may serialized/parsed with any setialization format.
 - Cross-Language: can be easily implemented in any language
 
 
@@ -42,7 +41,7 @@ Basically, **Yamp** operates with frames that are tranfered over specific transp
   |                                               |
   |  body (user frames only)                      |
   |  +-----------------------------------------+  |
-  |  |                                         |  |
+  |  |               binary data               |  |
   |  |      (protobuf, msgpack, json, etc)   <-|--|------ format
   |  |                                         |  |
   |  +-----------------------------------------+  |
@@ -50,7 +49,7 @@ Basically, **Yamp** operates with frames that are tranfered over specific transp
   +-----------------------------------------------+
 +---------------------------------------------------+
 |                                                   |
-|            (tcp, udp, websocket, etc...)          | <-- transport
+|            (tcp/tls, ws/wss, etc...)              | <-- transport
 |                                                   |
 +---------------------------------------------------+
 
@@ -63,17 +62,6 @@ From a transport adapter, **Yamp** expects ability to send/receive buffer (bytes
 transport.write(buffer)
 buffer = transport.read()
 ```
-
-
-### Format adapters
-From a serialization format adapter **Yamp** expecet ability to serialize/parse a buffer of data.
-If serializer supports schema validation, it may be done in this step.
-
-```
-buffer = format.serialize(obj)
-obj = format.parse(buffer, [type])
-```
-
 
 ## Assumptions
 
@@ -130,21 +118,18 @@ handshake (echo) in case it support client, or with either
 
 ```
 //
-//        0         15                23                    N
-//  ~ ~ ~ +--------+ +----------------++------------~ ~ ~ ~--+
-//        | 2      | | 1              || 1 x size            |
-//        +--------+ +----------------++------------~ ~ ~ ~--+
-//        |version | | size           || serializer          |
-//  ~ ~ ~ +--------+ +----------------++------------~ ~ ~ ~--+
+//        0       15
+//  ~ ~ ~ +--------+
+//        | 2      |
+//        +--------+
+//        |version |
+//  ~ ~ ~ +--------+
 //
 
 system.handshake {
 
   byte[2]      version     // (required)
-
-  byte         size        // (required)
-  string[size] serializer  // (required)
-
+  
 }
 
 ```
@@ -288,7 +273,6 @@ UserMessageHeader {
 #### UserMessageBody
 
 Common body for most of user messages.
-Contains body serialized with serializer agreed in `system.handshake` message.
 
 ```
 //
@@ -311,7 +295,7 @@ UserMessageBody {
 
 ### 0x05 event
 
-User message (pub/sub event) with custom body represented in defined format.
+User message (pub/sub event) with binary body in any serialization format
 
 ```
 //
