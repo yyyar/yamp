@@ -89,14 +89,13 @@ Frame {
 
   select(type) {
     0x00: system.handshake,
-    0x01: system.ping,
-    0x02: system.pong,
-    0x03: system.close,
-    0x04: system.close-redirect,
-    0x05: event,
-    0x06: request,
-    0x07: cancel,
-    0x08: response
+    0x01: system.close,
+    0x02: system.ping,
+
+    0x10: event,
+    0x11: request,
+    0x12: cancel,
+    0x13: response
   }
 }
 ```
@@ -113,8 +112,7 @@ frames and use User Messages instead.
 
 Should be first frame after connection establishment client party sends
 to server party to identify itself. Server party should respond with the same
-handshake (echo) in case it support client, or with either
-`system.close` or `system:close-redirect` frame.
+handshake (echo) in case it support client, or with `system.close` frame.
 
 ```
 //
@@ -135,58 +133,17 @@ system.handshake {
 ```
 
 
-### 0x01 system.ping
-My be periodically sent by any party to another to check if it's alive or
-keep underlying connection or session alive.
-Each `system.ping` frame from one party should be followed with corresponding
-`system.pong` message from another party with the same payload within defined (reasonable)
-pediod of time.
-
-```
-//
-//        0        7                      N
-//  ~ ~ ~ +--------++------------~ ~ ~ ~--+ 
-//        | 1      || 1 x size            | 
-//        +--------++------------~ ~ ~ ~--+ 
-//        | size   || payload             | 
-//  ~ ~ ~ +--------++------------~ ~ ~ ~--+ 
-//
-
-system.ping {
-
- byte          size     // (required)
- string[size]  payload  // (optional)
-
-}
-
-```
-
-
-### 0x02 system.pong
-Response for a `system.ping`. See `system.ping`.
-
-```
-//
-//        0        7                      N
-//  ~ ~ ~ +--------++------------~ ~ ~ ~--+ 
-//        | 1      || 1 x size            | 
-//        +--------++------------~ ~ ~ ~--+ 
-//        | size   || payload             | 
-//  ~ ~ ~ +--------++------------~ ~ ~ ~--+ 
-//
-
-system.pong {
-
-  byte          size      // (required)
-  string[size]  payload   // (optional)
-
-}
-
-```
-
-### 0x03 system.close
+### 0x01 system.close
 Should be sent by any party before gracefully closing connection.
-Connection or session drop should follow this message.
+Connection or session drop should follow this message. Reason of connection
+drop and recommendation on what action to do depends on code.
+
+Is server party wants client to use
+another server with different url it sends code = 'redirect'. 
+After this message server should close connection / session.
+In this case `message` field should contain string in the following format: 
+`<protocol>://<host>:<port>[/uri]`, for example:
+`tcp://192.168.0.42:5000` or `ws://hostname:8888/hello/world?msg=goodmorning`
 
 ```
 //
@@ -200,35 +157,45 @@ Connection or session drop should follow this message.
 
 system.close {
 
-  byte[2]        size     // (required)
-  string[size]   reason   // (optional)
+  byte           code = {    // (required)
+    0x00: unknown,
+    0x01: version_not_supported,
+    0x02: timeout,
+    0x03: redirect,
+  }
+
+  byte[2]        size       // (required)
+  string[size]   message    // (optional)
 
 }
 
 ```
 
-### 0x04 system.close-redirect
-Server party sends this message when it wants client to use
-another server with different url. After this message server
-should close connection / session.
 
-`url` has the following format: `<protocol>://<host>:<port>[/uri]`,
-for example: `tcp://192.168.0.42:5000` or `ws://hostname:8888/hello/world?msg=goodmorning`
+
+### 0x02 system.ping
+My be periodically sent by any party to another to check if it's alive or
+keep underlying connection or session alive.
+Each `system.ping` frame with false 'ack' from one party should be followed with corresponding
+`system.ping` message from another party with 'ack' field set to 'true' and the 
+same payload within defined (reasonable) pediod of time.
 
 ```
 //
-//        0                15                     N
-//  ~ ~ ~ +----------------++------------~ ~ ~ ~--+
-//        | 2              || 1 x size            |
-//        +----------------++------------~ ~ ~ ~--+
-//        | size           || url                 |
-//  ~ ~ ~ +----------------++------------~ ~ ~ ~--+
+//        0        7                      N
+//  ~ ~ ~ +--------++------------~ ~ ~ ~--+ 
+//        | 1      || 1 x size            | 
+//        +--------++------------~ ~ ~ ~--+ 
+//        | size   || payload             | 
+//  ~ ~ ~ +--------++------------~ ~ ~ ~--+ 
 //
 
-system.close-redirect {
+system.ping {
+ 
+ ack           bool     // (required)
+ byte          size     // (required)
+ string[size]  payload  // (optional)
 
-    byte[2]       size    // (required)
-    string[size]  url  // (required)
 }
 
 ```
@@ -293,7 +260,7 @@ UserMessageBody {
 ```
 
 
-### 0x05 event
+### 0x10 event
 
 User message (pub/sub event) with binary body in any serialization format
 
@@ -317,7 +284,7 @@ event {
 ```
 
 
-### 0x06 request
+### 0x11 request
 
 Request from one party to another. Requester should wait until
 corresponding `response` message comes to fulfull request. Requester
@@ -344,14 +311,11 @@ request {
 ```
 
 
-### 0x07 cancel
+### 0x12 cancel
 
 If requester wants to ask requested party to cancel (or stop) processing
-previously sent `request` it should use this message. By default requester wants
-requested party to gracefully cancel request (that should result into `cancelled`
-type of response). When using `kill` flag, requester indicates it no longer interested
-in processing the request, responder should interrupt request
-processing, not trying to perform graceful rollback, and should not send any response.
+previously sent `request` it should use this message. Meaning of cancel
+is implementation dependent and may be graceful rollback or just halt.
 
 ```
 //
@@ -367,14 +331,13 @@ cancel {
 
   UserMessageHeader  header       // (required)
   byte[16]           request_uid  // (required) original request id to cancel
-  byte(bool)         kill         // (required) interrupt request processing
 
 }
 
 ```
 
 
-### 0x08 response
+### 0x13 response
 
 Response is message sent by party that previously received `request` and:
 - successfully completed request (`done`)
