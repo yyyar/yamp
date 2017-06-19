@@ -293,18 +293,17 @@ which requester should provide user with an timeout error.
 
 ```
 //
-//        0                     N        N+8                  N+8+M
-//  ~ ~ ~ +-~ ~ ~ ~ ~ ~ ~ ~ ~ ~-++--------++-~ ~ ~ ~ ~ ~ ~ ~ ~ ~-+
-//        |                     ||   1    ||                     |
-//        | UserMessageHeader   |+--------+|   UserMessageBody   |
-//        |                     ||progr...||                     |
-//  ~ ~ ~ +-~ ~ ~ ~ ~ ~ ~ ~ ~ ~-++--------++-~ ~ ~ ~ ~ ~ ~ ~ ~ ~-+
+//        0                     N                      M
+//  ~ ~ ~ +-~ ~ ~ ~ ~ ~ ~ ~ ~ ~-++-~ ~ ~ ~ ~ ~ ~ ~ ~ ~-+
+//        |                     ||                     |
+//        | UserMessageHeader   ||   UserMessageBody   |
+//        |                     ||                     |
+//  ~ ~ ~ +-~ ~ ~ ~ ~ ~ ~ ~ ~ ~-++-~ ~ ~ ~ ~ ~ ~ ~ ~ ~-+
 //
 
 request {
 
   UserMessageHeader  header       // (required)
-  byte(bool)         progressive  // (required) want receive progress responses
   UserMessageBody    body         // (required)
 
 }
@@ -342,7 +341,7 @@ cancel {
 Response is message sent by party that previously received `request` and:
 - successfully completed request (`done`)
 - faced error while processing request (`error`)
-- got next progress step, if requester originally requested progressive responses (`progress`)
+- got next progress step, if responder supports progress (`progress`)
 - successfully cancelled request if got from requester `cancel` message.
 
 ```
