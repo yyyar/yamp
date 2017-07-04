@@ -1,3 +1,5 @@
+<img src="/yamp-logo.png?raw=true" alt="yamp" width="256px" />
+
 ## Yamp - Application Messaging Protocol
 
 **Yamp** is simple and flexible messaging protocol for
@@ -374,4 +376,7 @@ response {
 ## Authors
 - Yaroslav Pogrebnyak <yyyaroslav@gmail.com>
 - Illarion Kovalchuk <illarion.kovalchuk@gmail.com>
+
+## Logo
+- [Max Demchenko](https://www.linkedin.com/in/max-demchenko-116170112)
 
