@@ -9,6 +9,9 @@ and format agnostic and may be adopted to any specific needs.
 
 This document describes **Yamp v1.0 Draft**.
 
+## Implementations
+- Javascript & Node.JS: [yamp-js](https://github.com/yyyar/yamp-js)
+- Golang: [yamp-go](https://github.com/yyyar/yamp-go)
 
 ## Background
 
